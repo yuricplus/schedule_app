@@ -65,7 +65,7 @@
                 <label for="checkbox">{{list.title}}</label>
               </div>
               <img v-if="list.priority" src="../statics/alert.png" class="list-priodity" title="Essa Tarefa é priodidade" alt="Priodidade" width="30">
-              <img src="../statics/delete.png" alt="delete" width="30">
+              <img src="../statics/delete.png" v-on:click="deleteList()" alt="delete" width="30">
          </li>
         </ul>
     </section>
@@ -79,11 +79,44 @@
     <section class="container-news-list">
       <ul>
         <li v-for="news in dataNews.articles" class="content-list-news" :key="news.title">
-          <img v-bind:src="news.urlToImage" alt="image" width="300">
+          <a :href="news.url" target="_blank">
+              <img v-bind:src="news.urlToImage" @error="imageLoadError" alt="image" width="300">
+          </a>
           <div class="spacing-border">
-            <h5>{{news.title}}</h5>
+            <a :href="news.url" target="_blank">
+              <h5>{{ news.title }}</h5>
+            </a>
             <p>{{news.description}}</p>
           </div>
+          <div class="footer-list-content">
+            Por {{news.author}} - Às {{news.publishedAt |  moment("HH:MM")}}
+          </div>
+        </li>
+      </ul>
+    </section>
+
+     <section>
+      <div class="content-list-title">
+        <h5><b>Albuns e musicas Lançadas hoje</b></h5>
+      </div>
+    </section>
+    <section class="container-list-albuns">
+      <ul v-if="albunsReleased">
+        <li class="content-list-albuns" v-for="albums in albunsReleased.items" :key="albums.id">
+            <img :src="albums.images[1].url" alt="" width="300" height="300">
+            <div class="content-about-album">
+                <p>{{albums.album_type}}</p>
+                <h5>{{albums.name}}</h5>
+                <div class="about-artists">
+                  <p class="gray">De</p>
+                <p v-for="artist in albums.artists" :key="artist.id">
+                  <a :href="artist.external_urls.spotify" target="_blank">
+                    {{ artist.name }} &nbsp;
+                  </a>
+                </p>
+                </div>
+                <a :href="albums.external_urls.spotify" type="button" class="play-on-spotify" target="_blank">Play on Spotify</a>
+            </div>
         </li>
       </ul>
     </section>
@@ -105,7 +138,11 @@ export default {
   components: {
     EssentialLink
   },
-
+  methods: {
+    deleteList() {
+      console.log("teste")
+    }
+  },
   mounted() {
     this.$axios.get('http://apiadvisor.climatempo.com.br/api/v1/weather/locale/3477/current?token=8564057d6b6ce399e09795c0fff9883a')
       .then((response) => {
@@ -131,6 +168,28 @@ export default {
           icon: 'report_problem'
         })
       })
+      const config = {
+        headers: { Authorization: `Bearer BQCLWF46DEq9DnYV0gVAoTlS8qWmFyJqBch7hkGXrBVTHcUhwL_HlV2j_9LJqQHOcJ30M7pdc5fCZO2zZaFA4YqTS_K4sSe6fOM3l03MVcL5c3PxFVJAbD6TrmpNSoJhJcVVq-uaKKZxXQY8GdCRHrY4PphK9YOeA7d1gd-mrnPKCp66aajk59Tv-JT5kkLwIUBOvbF5G-vxFDgNZ3tRy8Ex1vAzzAm-YyBPdCqXkc2LD_RihuiWTBHBMeTln0loxkN_58GMxCilS0Y` }
+      };
+      this.$axios.get('https://api.spotify.com/v1/browse/new-releases?country=BR', config)
+      .then((response) => {
+        this.albunsReleased = response.data.albums
+      })
+      .catch(() => {
+        this.$q.notify({
+          color: 'negative',
+          position: 'top',
+          message: 'Loading failed',
+          icon: 'report_problem'
+        })
+      })
+
+},
+
+methods: {
+  imageLoadError(e) {
+    e.target.src = '../statics/No-Image-Found.png'
+  }
 },
 
   data () {
@@ -139,6 +198,7 @@ export default {
       dataClime: null,
       dataNews: null,
       open: false,
+      albunsReleased: null,
       listToDoToday: [
         {
          title: 'Comprar Roupar1',
@@ -211,11 +271,17 @@ export default {
 <style>
 a {
   text-decoration: none;
-  color: #000000;
+  color: #236cb5;
 }
 
 #q-app {
   background-color: #9e9e9e14;
+}
+
+.gray {
+  color: #7d7d7d;
+  font-weight: bold;
+  margin-right: 5px;
 }
 
 .spacing-border {
@@ -339,22 +405,99 @@ section .content-list-title button {
 }
 
 .container-news-list ul {
-  list-style: none;
+   display: grid;
+   grid-template-columns: 1fr;
+   grid-gap: 24px;
+   list-style: none;
 }
 
 .container-news-list ul .content-list-news {
-  border: 1px solid #fff;
   margin: 20px;
-  background-color: #fff;
-  border-radius: 8px;
   display: flex;
   justify-content: space-between;
-  box-shadow: 2px 2px 2px #80808059;
   width: 900px;
+  position: relative;
+  border-bottom: 2px solid #80808059;
+}
+
+.container-news-list ul li h5 {
+  font-size: 20px;
+  margin-top: -10px;
+  margin-bottom: 10px;
+  line-height: 30px;
+  font-weight: 500;
+}
+
+.container-news-list ul li p {
+  color: #333333;
 }
 
 .container-news-list ul .content-list-news img {
-  border-bottom-left-radius: 8px;
-  border-top-left-radius: 8px;
+  width: 320px;
+  height: 180px;
+  margin-bottom: 20px;
+}
+
+.container-news-list ul li .footer-list-content {
+  position: absolute;
+  bottom: 0;
+  padding-bottom: 10px;
+  right: 15px;
+}
+
+.container-news-list ul li .spacing-border p {
+  font: 16px/20px Arial,sans-serif;
+  font-weight: 400;
+}
+
+.container-list-albuns {
+  margin: auto;
+}
+
+.container-list-albuns ul {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-gap: 24px;
+  list-style: none;
+}
+
+.container-list-albuns ul li{
+  border: 2px solid #eaeaea;
+  display: flex;
+  background-color: #222326;
+  color: #fff;
+  align-items: center;
+  margin: auto;
+  width: 1000px;
+}
+
+.container-list-albuns ul li .content-about-album {
+  margin-left: 20px;
+  margin-top: 20px;
+}
+
+.container-list-albuns ul li .content-about-album .about-artists {
+  display: flex;
+  color: #fff;
+}
+
+.container-list-albuns ul li h5 {
+  font-weight: bold;
+  font-size: 30px;
+  color: #fff;
+}
+
+.container-list-albuns ul li .about-artists a {
+  color: #eaeaea;
+}
+
+.container-list-albuns ul li .play-on-spotify {
+  border-radius: 30px;
+  color: #fff;
+  border: 2px solid #1db954;
+  background-color: #1db954;
+  font-weight: bold;
+  padding: 5px 24px;
+  cursor: pointer;
 }
 </style>
