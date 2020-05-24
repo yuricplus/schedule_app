@@ -14,8 +14,12 @@
   "dependencies": {
     "@quasar/extras": "^1.0.0",
     "axios": "^0.18.1",
+    "lodash": "^4.17.15",
     "quasar": "^1.0.0",
-    "vue-moment": "^4.1.0"
+    "vue-js-modal": "^2.0.0-rc.3",
+    "vue-lodash": "^2.1.2",
+    "vue-moment": "^4.1.0",
+    "vue-the-mask": "^0.11.1"
   },
   "devDependencies": {
     "@quasar/app": "^1.0.0",

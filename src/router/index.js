@@ -1,11 +1,15 @@
 import Vue from 'vue'
 import VueRouter from 'vue-router'
 import routes from './routes'
+import VModal from 'vue-js-modal'
+import lodash from 'lodash'
+import VueTheMask from 'vue-the-mask'
 
-
+Vue.use(VueTheMask)
 Vue.use(VueRouter)
-
+Vue.use(VModal)
 Vue.use(require('vue-moment'));
+Vue.moment().locale("DE")
 /*
  * If not building with SSR mode, you can
  * directly export the Router instantiation;

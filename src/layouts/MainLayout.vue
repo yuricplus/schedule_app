@@ -38,9 +38,9 @@
         />
       </q-list>
     </q-drawer>
-    <section class="container-backdrop">
+    <section class="container-backdrop" v-bind:style="backgroundClime">
       <div class="content-lead">
-        <h6>{{ dataClime.data.date | moment("dddd, MMMM Do YYYY") }}</h6>
+        <h6>{{ dataClime.data.date | moment("HH:MM, dddd, MMMM Do YYYY")}}</h6>
         <h4>{{ dataClime.name }}</h4>
         <h2>{{ dataClime.data.temperature }} C&deg;</h2>
         <h6 class="color-black">Sensação Termica: {{ dataClime.data.sensation}}&deg;</h6>
@@ -54,10 +54,10 @@
     <section>
       <div class="content-list-title">
         <h5><b>Lista de tarefa para hoje</b></h5>
-        <button @click="open = true" label="Open">Adicionar tarefa</button>
+        <button @click="show()" label="Open">Adicionar tarefa</button>
       </div>
     </section>
-    <section class="container-list-todo">
+    <section v-if="listToDoToday" class="container-list-todo">
         <ul>
           <li class="content-list-todo" v-for="list in listToDoToday" :key="list.title">
               <div class="content-list-checkbox">
@@ -65,9 +65,14 @@
                 <label for="checkbox">{{list.title}}</label>
               </div>
               <img v-if="list.priority" src="../statics/alert.png" class="list-priodity" title="Essa Tarefa é priodidade" alt="Priodidade" width="30">
-              <img src="../statics/delete.png" v-on:click="deleteList()" alt="delete" width="30">
+              <img src="../statics/delete.png" @click="deleteList(list.id)" alt="delete" width="30">
          </li>
         </ul>
+    </section>
+    <section v-else>
+      <div class="content-list-title">
+        <h5 style="color: red;"><b>Você não tem tarefas para hoje, adicione uma se houver.</b></h5>
+      </div>
     </section>
 
     <section>
@@ -76,7 +81,7 @@
       </div>
     </section>
 
-    <section class="container-news-list">
+    <section v-if="dataNews" class="container-news-list">
       <ul>
         <li v-for="news in dataNews.articles" class="content-list-news" :key="news.title">
           <a :href="news.url" target="_blank">
@@ -115,11 +120,31 @@
                   </a>
                 </p>
                 </div>
-                <a :href="albums.external_urls.spotify" type="button" class="play-on-spotify" target="_blank">Play on Spotify</a>
+                <a :href="albums.external_urls.spotify" type="button" class="play-on-spotify" target="_blank">Abrir no Spotify</a>
             </div>
         </li>
       </ul>
+      <div class="autorization" v-else>
+        <button @click="spotifyLogin()">
+          Autorizar Spotify
+        </button>
+      </div>
     </section>
+    <modal name="hello-world" :draggable="true" :adaptive="true" height="auto">
+      <div class="modal-container">
+        <h5>Criar uma nova tarefa</h5>
+        <form v-on:submit.prevent="createAssignment(assignmentName, assignmentDate)">
+          <input type="text" placeholder="Nome da tarefa" v-model="assignmentName">
+          <label for="urgente">Essa é uma tarefa urgente?</label>
+          <select name="warning">
+            <option value="not">Não</option>
+            <option value="yes">Sim</option>
+          </select>
+          <input type="text" v-model="assignmentDate" placeholder="Data de termino" v-mask="'##/##/####'">
+          <button type="button" @click="createAssignment(assignmentName, assignmentDate)">Criar tarefa</button>
+        </form>
+      </div>
+    </modal>
 
     <q-page-container>
       <router-view />
@@ -130,7 +155,9 @@
 <script>
 import Vue from 'vue'
 import EssentialLink from 'components/EssentialLink'
+import lodash from 'lodash'
 import axios from 'axios'
+import { Notify } from 'quasar'
 
 export default {
   name: 'MainLayout',
@@ -138,20 +165,68 @@ export default {
   components: {
     EssentialLink
   },
-  methods: {
-    deleteList() {
-      console.log("teste")
+   data () {
+    return {
+      leftDrawerOpen: false,
+      dataClime: null,
+      dataNews: null,
+      open: false,
+      tokenAuthSpotify: localStorage.getItem('token'),
+      accessTokeSpotify: localStorage.getItem('access_token'),
+      backgroundClime: null,
+      assignmentName: null,
+      assignmentDate: null,
+      assignmentPriority: null,
+      assignmentID: null,
+      albunsReleased: null,
+      listToDoToday: null
     }
   },
   mounted() {
-    this.$axios.get('http://apiadvisor.climatempo.com.br/api/v1/weather/locale/3477/current?token=8564057d6b6ce399e09795c0fff9883a')
+    const token = window.location.search.split('code=')[1];
+    if(token){
+      localStorage.setItem('token', token);
+       const config = {
+        headers: { 
+          'token': token,
+        }
+    };
+    this.$axios.post('http://localhost:3333/spotify', config)
       .then((response) => {
-        this.dataClime = response.data
+        localStorage.setItem('access_token', response.data.access_token)
+    })
+    .catch(() => {
+      this.$q.notify({
+      color: 'negative',
+      position: 'top-right',
+      message: 'Não é possivel listar dados de albuns no momento. Tente novamente mais tarde!',
+      icon: 'report_problem'
+    })
+  })
+    }
+    this.$axios.get('http://localhost:3333/list-to-do')
+      .then((response) => {
+        this.listToDoToday = response.data
       })
       .catch(() => {
         this.$q.notify({
           color: 'negative',
-          position: 'top',
+          position: 'top-right',
+          message: 'Loading failed',
+          icon: 'report_problem'
+        })
+    })
+    this.$axios.get('http://apiadvisor.climatempo.com.br/api/v1/weather/locale/3477/current?token=8564057d6b6ce399e09795c0fff9883a')
+      .then((response) => {
+        this.dataClime = response.data;
+        this.backgroundClime = { 
+        backgroundImage: 'linear-gradient(rgba(0, 0, 0, 0), rgb(247, 247, 247)), url(../statics/background-' +  this.dataClime.data.icon  + '.jpg)'
+      }
+      })
+      .catch(() => {
+        this.$q.notify({
+          color: 'negative',
+          position: 'top-right',
           message: 'Loading failed',
           icon: 'report_problem'
         })
@@ -163,13 +238,13 @@ export default {
       .catch(() => {
         this.$q.notify({
           color: 'negative',
-          position: 'top',
+          position: 'top-right',
           message: 'Loading failed',
           icon: 'report_problem'
         })
       })
       const config = {
-        headers: { Authorization: `Bearer BQCLWF46DEq9DnYV0gVAoTlS8qWmFyJqBch7hkGXrBVTHcUhwL_HlV2j_9LJqQHOcJ30M7pdc5fCZO2zZaFA4YqTS_K4sSe6fOM3l03MVcL5c3PxFVJAbD6TrmpNSoJhJcVVq-uaKKZxXQY8GdCRHrY4PphK9YOeA7d1gd-mrnPKCp66aajk59Tv-JT5kkLwIUBOvbF5G-vxFDgNZ3tRy8Ex1vAzzAm-YyBPdCqXkc2LD_RihuiWTBHBMeTln0loxkN_58GMxCilS0Y` }
+        headers: { Authorization: `Bearer ${ this.accessTokeSpotify }` }
       };
       this.$axios.get('https://api.spotify.com/v1/browse/new-releases?country=BR', config)
       .then((response) => {
@@ -178,97 +253,118 @@ export default {
       .catch(() => {
         this.$q.notify({
           color: 'negative',
-          position: 'top',
-          message: 'Loading failed',
+          position: 'top-right',
+          message: 'Não é possivel listar dados de albuns no momento. Tente novamente mais tarde!',
           icon: 'report_problem'
         })
       })
-
 },
 
 methods: {
   imageLoadError(e) {
     e.target.src = '../statics/No-Image-Found.png'
+  },
+  spotifyLogin(){
+    let redirect = 'http://localhost:8080/#'
+    window.location.href = `https://accounts.spotify.com/authorize?client_id=3f00284ce6504784ac44547e33d589d9&response_type=code&redirect_uri=${encodeURIComponent(redirect)}&scope=user-read-private%20user-read-email&state=34fFs29kd09`
+  },
+  async deleteList(id) {
+    
+    await this.$axios.delete(`http://localhost:3333/delete-list/${id}`)
+      .then((response) => {
+        this.$q.notify({
+          color: 'positive',
+          progress: true,
+          position: 'top-right',
+          message: 'Tarefa removida com sucesso!',
+          icon: 'announcement'
+        })
+        this.$axios.get('http://localhost:3333/list-to-do')
+          .then((response) => {
+          this.listToDoToday = response.data
+       })
+      .catch(() => {
+        this.$q.notify({
+          color: 'negative',
+          position: 'top-right',
+          message: 'Loading failed',
+          icon: 'report_problem'
+        })
+    })
+      })
+      .catch(() => {
+        this.$q.notify({
+          color: 'negative',
+          position: 'top-right',
+          message: 'Não é possivel deletar no momento. Tente novamente mais tarde!',
+          icon: 'report_problem'
+        })
+      })
+  },
+  async createAssignment(assignmentName, assignmentDate){
+    if(assignmentName === null || assignmentDate === null) {
+      this.$q.notify({
+          color: 'negative',
+          progress: true,
+          position: 'top-right',
+          message: 'Por favor preencha todos os campos!.',
+          icon: 'report_problem'
+        })
+    }
+    await this.$axios.post('http://localhost:3333/create-list-to-do', 
+     {
+       body: {
+         title: assignmentName,
+         date: assignmentDate,
+         priority: 'Sim'
+     }
+     })
+      .then((response) => {
+        this.$modal.hide('hello-world');
+        this.$q.notify({
+          color: 'positive',
+          progress: true,
+          position: 'top-right',
+          message: 'Tarefa criada com sucesso!',
+          icon: 'announcement'
+        })
+        this.$axios.get('http://localhost:3333/list-to-do')
+          .then((response) => {
+          this.listToDoToday = response.data
+      })
+      .catch(() => {
+        this.$q.notify({
+          color: 'negative',
+          position: 'top-right',
+          message: 'Loading failed',
+          icon: 'report_problem'
+        })
+    })
+      })
+      .catch(() => {
+        this.$q.notify({
+          color: 'negative',
+          progress: true,
+          position: 'top-right',
+          message: 'Surgiu um probelma, use um caderno para anotar suas tarefas enquanto isso.',
+          icon: 'report_problem'
+        })
+      })
+  },
+  show() {
+      this.$modal.show('hello-world');
+  },
+  hide() {
+      this.$modal.hide('hello-world');
   }
 },
-
-  data () {
-    return {
-      leftDrawerOpen: false,
-      dataClime: null,
-      dataNews: null,
-      open: false,
-      albunsReleased: null,
-      listToDoToday: [
-        {
-         title: 'Comprar Roupar1',
-         description: "Tenho que ir para lavanderina para poder lavar minhas roupas sujas",
-         validate: "20/04/2020/ 20hs",
-         priority: true
-      }, 
-      {
-         title: 'Comprar Roupar e sair por ai pra comprar',
-         description: "Tenho que ir para lavanderina",
-         validate: "20/04/2020/ 20hs",
-         priority: false
-      },
-       {
-         title: 'Comprar Roupar3',
-         description: "Tenho que ir para lavanderina",
-         validate: "20/04/2020/ 20hs",
-         priority: true
-      }
-      ],
-      essentialLinks: [
-        {
-          title: 'Docs',
-          caption: 'quasar.dev',
-          icon: 'school',
-          link: 'https://quasar.dev'
-        },
-        {
-          title: 'Github',
-          caption: 'github.com/quasarframework',
-          icon: 'code',
-          link: 'https://github.com/quasarframework'
-        },
-        {
-          title: 'Discord Chat Channel',
-          caption: 'chat.quasar.dev',
-          icon: 'chat',
-          link: 'https://chat.quasar.dev'
-        },
-        {
-          title: 'Forum',
-          caption: 'forum.quasar.dev',
-          icon: 'record_voice_over',
-          link: 'https://forum.quasar.dev'
-        },
-        {
-          title: 'Twitter',
-          caption: '@quasarframework',
-          icon: 'rss_feed',
-          link: 'https://twitter.quasar.dev'
-        },
-        {
-          title: 'Facebook',
-          caption: '@QuasarFramework',
-          icon: 'public',
-          link: 'https://facebook.quasar.dev'
-        },
-        {
-          title: 'Quasar Awesome',
-          caption: 'Community Quasar projects',
-          icon: 'favorite',
-          link: 'https://awesome.quasar.dev'
-        }
-      ]
-    }
-  }
 }
 </script>
 
 <style>
+button {
+  cursor: pointer;
+}
 a {
   text-decoration: none;
   color: #236cb5;
@@ -290,7 +386,6 @@ a {
 }
 
 .container-backdrop {
-  background-image: linear-gradient(rgba(0, 0, 0, 0), rgb(247, 247, 247)), url('../statics/background-rain-nigth.jpg');
   background-repeat: no-repeat;
   background-size: cover;
   height: 400px;
@@ -304,10 +399,12 @@ a {
   top: 100px;
   left: 300px;
   margin-bottom: -40px;
+  text-shadow: 1px 1px 7px #000000;
+  color: #fff;
 }
 
 .container-backdrop .content-lead h4, h2, .color-black {
-  color: #000000;
+  color: #fff;
 }
 
 .container-backdrop .content-img {
@@ -327,9 +424,10 @@ a {
 
 .container-backdrop .content-img h4 {
   font-weight: bold;
-  color: #949494;
+  color: #fff;
   font-size: 25px;
   margin-top: 15px;
+  text-shadow: 1px 1px 7px #000000;
 }
 
 .container-list-todo {
@@ -443,6 +541,8 @@ section .content-list-title button {
   bottom: 0;
   padding-bottom: 10px;
   right: 15px;
+  font-weight: bold;
+  color: #333;
 }
 
 .container-news-list ul li .spacing-border p {
@@ -499,5 +599,58 @@ section .content-list-title button {
   font-weight: bold;
   padding: 5px 24px;
   cursor: pointer;
+}
+
+.container-list-albuns .autorization {
+  margin-top: 100px;
+  display: flex;
+  justify-content: center;
+}
+
+.container-list-albuns .autorization button{
+  border-radius: 30px;
+  color: #fff;
+  border: 2px solid #1db954;
+  background-color: #1db954;
+  font-weight: bold;
+  padding: 5px 24px;
+  cursor: pointer;
+}
+
+.modal-container {
+  padding: 15px;
+}
+
+.modal-container form{
+  display: flex;
+  flex-direction: column;
+  width: 90%;
+  padding: 15px;
+}
+
+.modal-container form label {
+  font-weight: 500;
+  font-size: 15px;
+  color: #222326;
+}
+
+.modal-container form input, select {
+  padding: 10px;
+  border-radius: 8px;
+  border: 2px solid #eeeeee;
+  background-color: #eaeaea;
+}
+
+.modal-container form * {
+  margin: 2px;
+}
+
+.modal-container form button {
+  background-color: #236cb5;
+  color: #eaeaea;
+  border-radius: 8px;
+  padding: 10px;
+  border: none;
+  margin-top: 15px;
 }
 </style>
