@@ -31,11 +31,6 @@
         >
           Essential Links
         </q-item-label>
-        <EssentialLink
-          v-for="link in essentialLinks"
-          :key="link.title"
-          v-bind="link"
-        />
       </q-list>
     </q-drawer>
     <section class="container-backdrop" v-bind:style="backgroundClime">
@@ -60,11 +55,19 @@
     <section v-if="listToDoToday" class="container-list-todo">
         <ul>
           <li class="content-list-todo" v-for="list in listToDoToday" :key="list.title">
-              <div class="content-list-checkbox">
-                <input type="checkbox">
-                <label for="checkbox">{{list.title}}</label>
+              <div class="content-list-checkbox verticall">
+                <span>Nome da atividade</span>
+                <p>{{list.assignmentName}}</p>
               </div>
-              <img v-if="list.priority" src="../statics/alert.png" class="list-priodity" title="Essa Tarefa é priodidade" alt="Priodidade" width="30">
+              <div class="content-list-checkbox d-flex verticall">
+                 <span>Hora de inicio</span>
+                 <p>{{list.assignmentDate}}</p>
+              </div>
+              <div class="content-list-checkbox d-flex verticall">
+                 <span>Hora de termino</span>
+                 <p>{{list.assignmentDateEnd}}</p>
+              </div>
+              <img v-if="list.assignmentAlert" src="../statics/alert.png" class="list-priodity" title="Essa Tarefa é priodidade" alt="Priodidade" width="30">
               <img src="../statics/delete.png" @click="deleteList(list.id)" alt="delete" width="30">
          </li>
         </ul>
@@ -132,16 +135,20 @@
     </section>
     <modal name="hello-world" :draggable="true" :adaptive="true" height="auto">
       <div class="modal-container">
-        <h5>Criar uma nova tarefa</h5>
+        <h5 class="title-modal">Criar uma nova tarefa</h5>
         <form v-on:submit.prevent="createAssignment(assignmentName, assignmentDate)">
-          <input type="text" placeholder="Nome da tarefa" v-model="assignmentName">
-          <label for="urgente">Essa é uma tarefa urgente?</label>
-          <select name="warning">
-            <option value="not">Não</option>
-            <option value="yes">Sim</option>
-          </select>
-          <input type="text" v-model="assignmentDate" placeholder="Data de termino" v-mask="'##/##/####'">
-          <button type="button" @click="createAssignment(assignmentName, assignmentDate)">Criar tarefa</button>
+          <div class="d-flex">
+            <input type="text" placeholder="Nome da tarefa" v-model="assignmentName">
+            <div class="d-flex">
+              <input type="checkbox" name="urgent" id="urgente" v-model="assignmentAlert">  
+              <label for="urgente">Urgente</label>
+            </div>
+          </div>
+          <div class="d-flex">
+            <input type="text" v-model="assignmentDate" placeholder="Hora de inicio" v-mask="'##:##'">
+            <input type="text" v-model="assignmentDateEnd" placeholder="Hora de Termino" v-mask="'##:##'">
+          </div>
+          <button type="button" @click="createAssignment(assignmentName, assignmentDate, assignmentDateEnd, assignmentAlert)">Criar tarefa</button>
         </form>
       </div>
     </modal>
@@ -162,9 +169,6 @@ import { Notify } from 'quasar'
 export default {
   name: 'MainLayout',
   
-  components: {
-    EssentialLink
-  },
    data () {
     return {
       leftDrawerOpen: false,
@@ -177,9 +181,11 @@ export default {
       assignmentName: null,
       assignmentDate: null,
       assignmentPriority: null,
+      assignmentAlert: null,
+      assignmentDateEnd: null,
       assignmentID: null,
       albunsReleased: null,
-      listToDoToday: null
+      listToDoToday: JSON.parse(localStorage.getItem('assignment')) ? JSON.parse(localStorage.getItem('assignment')).list : null
     }
   },
   mounted() {
@@ -204,18 +210,6 @@ export default {
     })
   })
     }
-    this.$axios.get('http://localhost:3333/list-to-do')
-      .then((response) => {
-        this.listToDoToday = response.data
-      })
-      .catch(() => {
-        this.$q.notify({
-          color: 'negative',
-          position: 'top-right',
-          message: 'Loading failed',
-          icon: 'report_problem'
-        })
-    })
     this.$axios.get('http://apiadvisor.climatempo.com.br/api/v1/weather/locale/3477/current?token=8564057d6b6ce399e09795c0fff9883a')
       .then((response) => {
         this.dataClime = response.data;
@@ -269,87 +263,39 @@ methods: {
     window.location.href = `https://accounts.spotify.com/authorize?client_id=3f00284ce6504784ac44547e33d589d9&response_type=code&redirect_uri=${encodeURIComponent(redirect)}&scope=user-read-private%20user-read-email&state=34fFs29kd09`
   },
   async deleteList(id) {
-    
-    await this.$axios.delete(`http://localhost:3333/delete-list/${id}`)
-      .then((response) => {
-        this.$q.notify({
-          color: 'positive',
-          progress: true,
-          position: 'top-right',
-          message: 'Tarefa removida com sucesso!',
-          icon: 'announcement'
-        })
-        this.$axios.get('http://localhost:3333/list-to-do')
-          .then((response) => {
-          this.listToDoToday = response.data
-       })
-      .catch(() => {
-        this.$q.notify({
-          color: 'negative',
-          position: 'top-right',
-          message: 'Loading failed',
-          icon: 'report_problem'
-        })
-    })
-      })
-      .catch(() => {
-        this.$q.notify({
-          color: 'negative',
-          position: 'top-right',
-          message: 'Não é possivel deletar no momento. Tente novamente mais tarde!',
-          icon: 'report_problem'
-        })
-      })
+    const storage = JSON.parse(localStorage.getItem('assignment'));
+
+    storage.list.forEach((task, index) => {
+      if(task.id === id) {
+         storage.list.splice(index, 1);
+
+         localStorage.setItem('assignment', JSON.stringify(storage))
+         this.listToDoToday = JSON.parse(localStorage.getItem('assignment')).list;
+      }
+    });
   },
-  async createAssignment(assignmentName, assignmentDate){
-    if(assignmentName === null || assignmentDate === null) {
-      this.$q.notify({
+  async createAssignment(assignmentName, assignmentDate, assignmentDateEnd, assignmentAlert){
+    if(assignmentName === null || assignmentDate === null) return this.$q.notify({
           color: 'negative',
           progress: true,
           position: 'top-right',
           message: 'Por favor preencha todos os campos!.',
           icon: 'report_problem'
-        })
-    }
-    await this.$axios.post('http://localhost:3333/create-list-to-do', 
-     {
-       body: {
-         title: assignmentName,
-         date: assignmentDate,
-         priority: 'Sim'
-     }
-     })
-      .then((response) => {
-        this.$modal.hide('hello-world');
-        this.$q.notify({
-          color: 'positive',
-          progress: true,
-          position: 'top-right',
-          message: 'Tarefa criada com sucesso!',
-          icon: 'announcement'
-        })
-        this.$axios.get('http://localhost:3333/list-to-do')
-          .then((response) => {
-          this.listToDoToday = response.data
-      })
-      .catch(() => {
-        this.$q.notify({
-          color: 'negative',
-          position: 'top-right',
-          message: 'Loading failed',
-          icon: 'report_problem'
-        })
     })
-      })
-      .catch(() => {
-        this.$q.notify({
-          color: 'negative',
-          progress: true,
-          position: 'top-right',
-          message: 'Surgiu um probelma, use um caderno para anotar suas tarefas enquanto isso.',
-          icon: 'report_problem'
-        })
-      })
+    const assignmentStorage = JSON.parse(localStorage.getItem('assignment')) || { 'list': []};
+    const id = Math.floor(1000 + Math.random() * 9000);
+    const assigment = {
+      assignmentName,
+      assignmentDate,
+      assignmentDateEnd,
+      assignmentAlert,
+      id
+    }
+
+    assignmentStorage.list.push(assigment)
+    localStorage.setItem('assignment', JSON.stringify(assignmentStorage))
+    this.hide();
+    this.listToDoToday = JSON.parse(localStorage.getItem('assignment')).list;
   },
   show() {
       this.$modal.show('hello-world');
@@ -474,6 +420,11 @@ section .content-list-title button {
   box-shadow: 2px 2px 2px gray;
 }
 
+.title-modal {
+  font-weight: bold;
+  color: #1976d2;
+}
+
 .container-list-todo ul li input {
   width: 20px;
   height: 20px;
@@ -495,6 +446,7 @@ section .content-list-title button {
 
 .container-list-todo ul li .list-priodity {
   margin-right: 10px;
+  width: 54px;
 }
 
 .container-news-list {
@@ -619,6 +571,8 @@ section .content-list-title button {
 
 .modal-container {
   padding: 15px;
+  width: 100%;
+  text-align: center;
 }
 
 .modal-container form{
@@ -626,6 +580,7 @@ section .content-list-title button {
   flex-direction: column;
   width: 90%;
   padding: 15px;
+  margin: auto;
 }
 
 .modal-container form label {
@@ -639,6 +594,13 @@ section .content-list-title button {
   border-radius: 8px;
   border: 2px solid #eeeeee;
   background-color: #eaeaea;
+  width: 100%;
+}
+
+.modal-container form input[type="checkbox"] {
+  width: 20px;
+  position: relative;
+  bottom: -5px;
 }
 
 .modal-container form * {
@@ -652,5 +614,24 @@ section .content-list-title button {
   padding: 10px;
   border: none;
   margin-top: 15px;
+}
+
+.d-flex {
+  display: flex;
+}
+
+.verticall {
+  flex-direction: column;
+}
+
+.verticall p, span {
+  color: #ffff;
+}
+
+.verticall span {
+  font-size: 10px;
+}
+.verticall p {
+  font-weight: bold;
 }
 </style>
