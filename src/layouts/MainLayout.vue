@@ -52,7 +52,7 @@
         <button @click="show()" label="Open">Adicionar tarefa</button>
       </div>
     </section>
-    <section v-if="listToDoToday" class="container-list-todo">
+    <section v-if="listToDoToday.length > 0" class="container-list-todo">
         <ul>
           <li class="content-list-todo" v-for="list in listToDoToday" :key="list.title">
               <div class="content-list-checkbox verticall">
@@ -185,7 +185,7 @@ export default {
       assignmentDateEnd: null,
       assignmentID: null,
       albunsReleased: null,
-      listToDoToday: JSON.parse(localStorage.getItem('assignment')) ? JSON.parse(localStorage.getItem('assignment')).list : null
+      listToDoToday: JSON.parse(localStorage.getItem('assignment')) ? JSON.parse(localStorage.getItem('assignment')).list : []
     }
   },
   mounted() {
@@ -264,15 +264,14 @@ methods: {
   },
   async deleteList(id) {
     const storage = JSON.parse(localStorage.getItem('assignment'));
+    const idIsnotEqual = item => item.id !== id;
 
-    storage.list.forEach((task, index) => {
-      if(task.id === id) {
-         storage.list.splice(index, 1);
+    const data = {
+      list: storage.list.filter(idIsnotEqual)
+    }
 
-         localStorage.setItem('assignment', JSON.stringify(storage))
-         this.listToDoToday = JSON.parse(localStorage.getItem('assignment')).list;
-      }
-    });
+    localStorage.setItem('assignment', JSON.stringify(data))
+    this.listToDoToday = JSON.parse(localStorage.getItem('assignment')).list;
   },
   async createAssignment(assignmentName, assignmentDate, assignmentDateEnd, assignmentAlert){
     if(assignmentName === null || assignmentDate === null) return this.$q.notify({
